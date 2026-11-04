@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="17156" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="NO" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <deployment identifier="macosx"/>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="17156"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="SystemMonitorPreferencePane" customModule="SystemMonitor" customModuleProvider="target">
+            <connections>
+                <outlet property="showBarsItem" destination="bAr-0x-Ck2" id="out-bA-r01"/>
+                <outlet property="showCPUItem" destination="cPu-0x-Ck1" id="out-CP-u01"/>
+                <outlet property="showDiskItem" destination="dSk-0x-Ck3" id="out-DS-k01"/>
+                <outlet property="showIconsItem" destination="iCo-0x-Ck4" id="out-IC-o01"/>
+                <outlet property="showMemoryItem" destination="mEm-0x-Ck2" id="out-ME-m01"/>
+                <outlet property="view" destination="vW0-00-ro1" id="out-VI-ew1"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <customView id="vW0-00-ro1">
+            <rect key="frame" x="0.0" y="0.0" width="380" height="190"/>
+            <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+            <subviews>
+                <textField verticalHuggingPriority="750" horizontalHuggingPriority="251" id="tIt-0x-Lb1">
+                    <rect key="frame" x="18" y="160" width="344" height="17"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" lineBreakMode="clipping" title="Items" id="tIt-0x-Cl1">
+                        <font key="font" metaFont="systemBold" size="13"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <button verticalHuggingPriority="750" tag="0" id="cPu-0x-Ck1">
+                    <rect key="frame" x="18" y="132" width="344" height="18"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Show CPU usage" bezelStyle="regularSquare" imagePosition="left" inset="2" id="cPu-0x-Ce1">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="didChangeCheckboxValue:" target="-2" id="cPu-0x-Ac1"/>
+                    </connections>
+                </button>
+                <button verticalHuggingPriority="750" tag="1" id="mEm-0x-Ck2">
+                    <rect key="frame" x="18" y="108" width="344" height="18"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Show Memory usage" bezelStyle="regularSquare" imagePosition="left" inset="2" id="mEm-0x-Ce2">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="didChangeCheckboxValue:" target="-2" id="mEm-0x-Ac2"/>
+                    </connections>
+                </button>
+                <button verticalHuggingPriority="750" tag="2" id="dSk-0x-Ck3">
+                    <rect key="frame" x="18" y="84" width="344" height="18"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Show Disk usage" bezelStyle="regularSquare" imagePosition="left" inset="2" id="dSk-0x-Ce3">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="didChangeCheckboxValue:" target="-2" id="dSk-0x-Ac3"/>
+                    </connections>
+                </button>
+                <textField verticalHuggingPriority="750" horizontalHuggingPriority="251" id="tIt-0x-Lb2">
+                    <rect key="frame" x="18" y="56" width="344" height="17"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <textFieldCell key="cell" lineBreakMode="clipping" title="Appearance" id="tIt-0x-Cl2">
+                        <font key="font" metaFont="systemBold" size="13"/>
+                        <color key="textColor" name="labelColor" catalog="System" colorSpace="catalog"/>
+                        <color key="backgroundColor" name="textBackgroundColor" catalog="System" colorSpace="catalog"/>
+                    </textFieldCell>
+                </textField>
+                <button verticalHuggingPriority="750" tag="3" id="iCo-0x-Ck4">
+                    <rect key="frame" x="18" y="28" width="344" height="18"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Show icons" bezelStyle="regularSquare" imagePosition="left" inset="2" id="iCo-0x-Ce4">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="didChangeCheckboxValue:" target="-2" id="iCo-0x-Ac4"/>
+                    </connections>
+                </button>
+                <button verticalHuggingPriority="750" tag="4" id="bAr-0x-Ck2">
+                    <rect key="frame" x="18" y="4" width="344" height="18"/>
+                    <autoresizingMask key="autoresizingMask" flexibleMaxX="YES" flexibleMinY="YES"/>
+                    <buttonCell key="cell" type="check" title="Show usage bars" bezelStyle="regularSquare" imagePosition="left" inset="2" id="bAr-0x-Ce2">
+                        <behavior key="behavior" changeContents="YES" doesNotDimImage="YES" lightByContents="YES"/>
+                        <font key="font" metaFont="system"/>
+                    </buttonCell>
+                    <connections>
+                        <action selector="didChangeCheckboxValue:" target="-2" id="bAr-0x-Ac2"/>
+                    </connections>
+                </button>
+            </subviews>
+        </customView>
+    </objects>
+</document>

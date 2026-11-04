@@ -1,0 +1,17 @@
+#
+#  Podfile
+#  SystemMonitor
+#
+#  Created by Luis on 04/11/2026.
+#
+
+platform :osx, '11.0'
+
+target 'SystemMonitor' do
+  # Comment the next line if you don't want to use dynamic frameworks
+  use_frameworks!
+
+  # PockKit
+  pod 'PockKit'
+
+end
