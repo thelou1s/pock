@@ -76,8 +76,31 @@ internal enum MetricKind: CaseIterable {
 			/// Older versions of macOS ship Activity Monitor here.
 			NSWorkspace.shared.open(URL(fileURLWithPath: "/Applications/Utilities/Activity Monitor.app"))
 		case .disk:
-			NSWorkspace.shared.open(URL(fileURLWithPath: "/"))
+			Self.openStorageSettings()
 		}
+	}
+
+	/// Opens the "Storage" pane of System Settings, the same destination as
+	/// About This Mac › More Info › Storage Settings.
+	private static func openStorageSettings() {
+		/// `com.apple.settings.Storage` is used from macOS 13 on, the legacy
+		/// preference pane identifier covers macOS 12 and earlier.
+		let identifiers = ["com.apple.settings.Storage", "com.apple.preference.storage"]
+		for identifier in identifiers {
+			guard let url = URL(string: "x-apple.systempreferences:\(identifier)") else {
+				continue
+			}
+			if NSWorkspace.shared.open(url) {
+				return
+			}
+		}
+		let app = URL(fileURLWithPath: "/System/Applications/System Settings.app")
+		if FileManager.default.fileExists(atPath: app.path) {
+			NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
+			return
+		}
+		/// Last resort: never leave the tap without a result.
+		NSWorkspace.shared.open(URL(fileURLWithPath: "/"))
 	}
 }
 

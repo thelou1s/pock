@@ -26,9 +26,6 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 
 	// MARK: Data
 
-	/// Refresh interval, in seconds.
-	private let refreshInterval: TimeInterval = 2
-
 	private let stackView = NSStackView(frame: .zero)
 
 	private var items: [MetricItem] = []
@@ -73,8 +70,8 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 			name: .shouldReloadSystemMonitor,
 			object: nil
 		)
+		primeSamplerIfNeeded()
 		reloadItems()
-		startRefreshing()
 	}
 
 	public func viewWillDisappear() {
@@ -101,6 +98,9 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 			stackView.addArrangedSubview(placeholder)
 		}
 		refresh()
+		/// The refresh interval is a preference, so the timer is rebuilt every
+		/// time the item list changes.
+		restartRefreshTimer()
 	}
 
 	private func clearItems() {
@@ -113,21 +113,25 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 
 	// MARK: Refresh
 
-	private func startRefreshing() {
-		stopRefreshing()
+	private func primeSamplerIfNeeded() {
 		/// Prime the sampler so that the first visible CPU value is a real delta
 		/// instead of the initial zero.
 		if !didPrimeSampler {
 			_ = SystemMetricsSampler.shared.sample()
 			didPrimeSampler = true
 		}
-		let timer = Timer(timeInterval: refreshInterval, repeats: true) { [weak self] _ in
+	}
+
+	/// (Re)builds the refresh timer with the interval currently stored in the
+	/// preferences.
+	private func restartRefreshTimer() {
+		stopRefreshing()
+		let timer = Timer(timeInterval: Preferences.refreshInterval, repeats: true) { [weak self] _ in
 			self?.refresh()
 		}
 		/// `.common` keeps the widget updating while the Touch Bar is scrolled.
 		RunLoop.main.add(timer, forMode: .common)
 		refreshTimer = timer
-		refresh()
 	}
 
 	private func stopRefreshing() {
@@ -144,6 +148,10 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 			item.value = snapshot[item.kind]
 			item.reloadPreferences()
 		}
+		#if DEBUG
+		/// Lets the headless test harness measure the refresh cadence.
+		print("[SystemMonitor] tick \(Date().timeIntervalSince1970)")
+		#endif
 	}
 
 	// MARK: Customization

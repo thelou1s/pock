@@ -21,9 +21,16 @@ internal struct Preferences {
 		case shouldShowDiskItem
 		case shouldShowIcons
 		case shouldShowBars
+		case refreshInterval
 	}
 
-	/// Every preference is a `Bool`: `true` when not set yet.
+	/// Supported refresh intervals, in seconds.
+	internal static let refreshIntervalRange: ClosedRange<Double> = 1...10
+
+	/// Refresh interval used until the user picks another one.
+	internal static let defaultRefreshInterval: Double = 2
+
+	/// Every boolean preference is `true` when not set yet.
 	private static let defaultValues: [Keys: Bool] = [
 		.shouldShowCPUItem: true,
 		.shouldShowMemoryItem: true,
@@ -61,6 +68,36 @@ internal struct Preferences {
 		return Preferences[.shouldShowBars]
 	}
 
+	/// The number of seconds between two readings, clamped to `refreshIntervalRange`.
+	internal static var refreshInterval: TimeInterval {
+		get {
+			var value = defaultRefreshInterval
+			/// Accept both real numbers and their string representation, so that
+			/// values set through `defaults write` or command line arguments are
+			/// honoured as well.
+			if let number = UserDefaults.standard.object(forKey: Keys.refreshInterval.rawValue) as? NSNumber {
+				value = number.doubleValue
+			} else if let string = UserDefaults.standard.object(forKey: Keys.refreshInterval.rawValue) as? NSString {
+				value = string.doubleValue
+			}
+			return clampedRefreshInterval(value)
+		}
+		set {
+			UserDefaults.standard.set(
+				clampedRefreshInterval(newValue),
+				forKey: Keys.refreshInterval.rawValue
+			)
+		}
+	}
+
+	/// Rounds to whole seconds and keeps the value inside `refreshIntervalRange`.
+	internal static func clampedRefreshInterval(_ value: Double) -> TimeInterval {
+		guard value.isFinite else {
+			return defaultRefreshInterval
+		}
+		return min(max(value.rounded(), refreshIntervalRange.lowerBound), refreshIntervalRange.upperBound)
+	}
+
 	/// The order in which enabled metrics are displayed in the Touch Bar.
 	internal static var enabledKinds: [MetricKind] {
 		var kinds: [MetricKind] = []
@@ -80,5 +117,6 @@ internal struct Preferences {
 		for (key, value) in defaultValues {
 			Preferences[key] = value
 		}
+		UserDefaults.standard.removeObject(forKey: Keys.refreshInterval.rawValue)
 	}
 }
