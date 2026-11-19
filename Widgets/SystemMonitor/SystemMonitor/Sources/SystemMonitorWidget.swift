@@ -64,6 +64,7 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 	}
 
 	public func viewDidAppear() {
+		Diagnostics.log("appear interval=\(Preferences.refreshInterval)")
 		NotificationCenter.default.addObserver(
 			self,
 			selector: #selector(reloadItems),
@@ -75,6 +76,7 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 	}
 
 	public func viewWillDisappear() {
+		Diagnostics.log("disappear")
 		NotificationCenter.default.removeObserver(self)
 		stopRefreshing()
 		clearItems()
@@ -83,6 +85,7 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 	// MARK: Items
 
 	@objc private func reloadItems() {
+		Diagnostics.log("reload interval=\(Preferences.refreshInterval)")
 		clearItems()
 		for kind in Preferences.enabledKinds {
 			let item = MetricItem(kind: kind)
@@ -126,6 +129,7 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 	/// preferences.
 	private func restartRefreshTimer() {
 		stopRefreshing()
+		Diagnostics.log("start timer interval=\(Preferences.refreshInterval)")
 		let timer = Timer(timeInterval: Preferences.refreshInterval, repeats: true) { [weak self] _ in
 			self?.refresh()
 		}
@@ -143,6 +147,7 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 		guard !items.isEmpty else {
 			return
 		}
+		Diagnostics.log("refresh")
 		let snapshot = SystemMetricsSampler.shared.sample()
 		for item in items {
 			item.value = snapshot[item.kind]
@@ -183,5 +188,31 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 		let image = NSImage(size: size)
 		image.addRepresentation(representation)
 		return image
+	}
+}
+
+// MARK: Diagnostics
+
+/// Temporary tracer used to measure the real refresh cadence inside Pock.
+/// Enabled with `defaults write com.pigigaldi.pock smTickLog -bool true`.
+internal enum Diagnostics {
+
+	private static let logURL = URL(fileURLWithPath: "/tmp/systemmonitor-ticks.log")
+
+	internal static func log(_ message: String) {
+		guard UserDefaults.standard.bool(forKey: "smTickLog") else {
+			return
+		}
+		let line = String(format: "%.3f %@\n", Date().timeIntervalSince1970, message)
+		guard let data = line.data(using: .utf8) else {
+			return
+		}
+		if let handle = try? FileHandle(forWritingTo: logURL) {
+			handle.seekToEndOfFile()
+			handle.write(data)
+			try? handle.close()
+		} else {
+			try? data.write(to: logURL)
+		}
 	}
 }
