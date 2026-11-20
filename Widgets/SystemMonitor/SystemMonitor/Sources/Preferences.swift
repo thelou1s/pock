@@ -19,6 +19,7 @@ internal struct Preferences {
 		case shouldShowCPUItem
 		case shouldShowMemoryItem
 		case shouldShowDiskItem
+		case shouldShowTemperatureItem
 		case shouldShowIcons
 		case shouldShowBars
 		case refreshInterval
@@ -35,6 +36,7 @@ internal struct Preferences {
 		.shouldShowCPUItem: true,
 		.shouldShowMemoryItem: true,
 		.shouldShowDiskItem: true,
+		.shouldShowTemperatureItem: true,
 		.shouldShowIcons: true,
 		.shouldShowBars: true
 	]
@@ -71,16 +73,7 @@ internal struct Preferences {
 	/// The number of seconds between two readings, clamped to `refreshIntervalRange`.
 	internal static var refreshInterval: TimeInterval {
 		get {
-			var value = defaultRefreshInterval
-			/// Accept both real numbers and their string representation, so that
-			/// values set through `defaults write` or command line arguments are
-			/// honoured as well.
-			if let number = UserDefaults.standard.object(forKey: Keys.refreshInterval.rawValue) as? NSNumber {
-				value = number.doubleValue
-			} else if let string = UserDefaults.standard.object(forKey: Keys.refreshInterval.rawValue) as? NSString {
-				value = string.doubleValue
-			}
-			return clampedRefreshInterval(value)
+			return clampedRefreshInterval(number(forKey: Keys.refreshInterval) ?? defaultRefreshInterval)
 		}
 		set {
 			UserDefaults.standard.set(
@@ -88,6 +81,19 @@ internal struct Preferences {
 				forKey: Keys.refreshInterval.rawValue
 			)
 		}
+	}
+
+	/// Reads a number stored either as a real number or as its string
+	/// representation, so that values set through `defaults write` or command line
+	/// arguments are honoured as well.
+	private static func number(forKey key: Keys) -> Double? {
+		if let number = UserDefaults.standard.object(forKey: key.rawValue) as? NSNumber {
+			return number.doubleValue
+		}
+		if let string = UserDefaults.standard.object(forKey: key.rawValue) as? NSString {
+			return string.doubleValue
+		}
+		return nil
 	}
 
 	/// Rounds to whole seconds and keeps the value inside `refreshIntervalRange`.
@@ -109,6 +115,9 @@ internal struct Preferences {
 		}
 		if Preferences[.shouldShowDiskItem] {
 			kinds.append(.disk)
+		}
+		if Preferences[.shouldShowTemperatureItem] {
+			kinds.append(.temperature)
 		}
 		return kinds
 	}

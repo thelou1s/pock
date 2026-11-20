@@ -13,6 +13,7 @@
 		00AA00000000000000000014 /* SystemMonitorWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00AA00000000000000000004 /* SystemMonitorWidget.swift */; };
 		00AA00000000000000000015 /* SystemMonitorPreferencePane.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00AA00000000000000000005 /* SystemMonitorPreferencePane.swift */; };
 		00AA00000000000000000016 /* SystemMonitorPreferencePane.xib in Resources */ = {isa = PBXBuildFile; fileRef = 00AA00000000000000000025 /* SystemMonitorPreferencePane.xib */; };
+		00AA00000000000000000017 /* Temperature.swift in Sources */ = {isa = PBXBuildFile; fileRef = 00AA00000000000000000009 /* Temperature.swift */; };
 		09B444D1988755EF05511012 /* Pods_SystemMonitor.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 8970800C8BFFEE82BBBD1401 /* Pods_SystemMonitor.framework */; };
 /* End PBXBuildFile section */
 
@@ -25,6 +26,7 @@
 		00AA00000000000000000006 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		00AA00000000000000000007 /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = Base; path = Base.lproj/SystemMonitorPreferencePane.xib; sourceTree = "<group>"; };
 		00AA00000000000000000008 /* SystemMonitor.pock */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = SystemMonitor.pock; sourceTree = BUILT_PRODUCTS_DIR; };
+		00AA00000000000000000009 /* Temperature.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Temperature.swift; sourceTree = "<group>"; };
 		1A2DCF420D97CFD0FFA02A0A /* Pods-SystemMonitor.release.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SystemMonitor.release.xcconfig"; path = "Target Support Files/Pods-SystemMonitor/Pods-SystemMonitor.release.xcconfig"; sourceTree = "<group>"; };
 		359A34A99FFE5BE5ED204774 /* Pods-SystemMonitor.debug.xcconfig */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.xcconfig; name = "Pods-SystemMonitor.debug.xcconfig"; path = "Target Support Files/Pods-SystemMonitor/Pods-SystemMonitor.debug.xcconfig"; sourceTree = "<group>"; };
 		8970800C8BFFEE82BBBD1401 /* Pods_SystemMonitor.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = Pods_SystemMonitor.framework; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -67,6 +69,7 @@
 				00AA00000000000000000001 /* SystemMetrics.swift */,
 				00AA00000000000000000002 /* Preferences.swift */,
 				00AA00000000000000000003 /* MetricItem.swift */,
+				00AA00000000000000000009 /* Temperature.swift */,
 				00AA00000000000000000004 /* SystemMonitorWidget.swift */,
 				00AA00000000000000000023 /* PreferencesPane */,
 			);
@@ -206,6 +209,7 @@
 				00AA00000000000000000011 /* SystemMetrics.swift in Sources */,
 				00AA00000000000000000012 /* Preferences.swift in Sources */,
 				00AA00000000000000000013 /* MetricItem.swift in Sources */,
+				00AA00000000000000000017 /* Temperature.swift in Sources */,
 				00AA00000000000000000014 /* SystemMonitorWidget.swift in Sources */,
 				00AA00000000000000000015 /* SystemMonitorPreferencePane.swift in Sources */,
 			);

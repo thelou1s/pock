@@ -23,6 +23,9 @@ public final class SystemMonitorPreferencePane: NSViewController, PKWidgetPrefer
 	private let refreshValueLabel = NSTextField(labelWithString: "")
 	private let refreshStepper = NSStepper(frame: .zero)
 
+	/// Temperature control, created in code like the refresh row.
+	private let showTemperatureItem = NSButton(checkboxWithTitle: "Show CPU temperature", target: nil, action: nil)
+
 	// MARK: PKWidgetPreference
 
 	public func reset() {
@@ -62,27 +65,35 @@ public final class SystemMonitorPreferencePane: NSViewController, PKWidgetPrefer
 		refreshValueLabel.font = NSFont.systemFont(ofSize: 13)
 		refreshValueLabel.textColor = .labelColor
 
-		refreshStepper.minValue = Preferences.refreshIntervalRange.lowerBound
-		refreshStepper.maxValue = Preferences.refreshIntervalRange.upperBound
-		refreshStepper.increment = 1
-		refreshStepper.valueWraps = false
-		refreshStepper.autorepeat = true
-		refreshStepper.target = self
-		refreshStepper.action = #selector(didChangeRefreshInterval(_:))
-		refreshStepper.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+		configure(refreshStepper,
+				  lowerBound: Preferences.refreshIntervalRange.lowerBound,
+				  upperBound: Preferences.refreshIntervalRange.upperBound,
+				  action: #selector(didChangeRefreshInterval(_:)))
 
 		let refreshRow = NSStackView(views: [refreshValueLabel, refreshStepper])
 		refreshRow.orientation = .horizontal
 		refreshRow.alignment = .centerY
 		refreshRow.spacing = 8
 
-		let refreshHeader = NSTextField(labelWithString: "Refresh rate")
-		refreshHeader.font = NSFont.systemFont(ofSize: 13, weight: .bold)
-		refreshHeader.textColor = .labelColor
+		let refreshHeader = Self.header("Refresh rate")
 
 		stackView.addArrangedSubview(refreshHeader)
 		stackView.setCustomSpacing(6, after: refreshHeader)
 		stackView.addArrangedSubview(refreshRow)
+
+		/// Temperature: one switch, because the CPU temperature is a single number.
+		/// The manager window only has room for a little more than the rows already
+		/// authored in the nib, so nothing here takes up a row of its own.
+		showTemperatureItem.font = NSFont.systemFont(ofSize: 13)
+		showTemperatureItem.target = self
+		showTemperatureItem.action = #selector(didChangeTemperatureItem(_:))
+
+		let temperatureHeader = Self.header("Temperature")
+
+		stackView.setCustomSpacing(14, after: refreshRow)
+		stackView.addArrangedSubview(temperatureHeader)
+		stackView.setCustomSpacing(6, after: temperatureHeader)
+		stackView.addArrangedSubview(showTemperatureItem)
 
 		view.addSubview(stackView)
 
@@ -93,6 +104,24 @@ public final class SystemMonitorPreferencePane: NSViewController, PKWidgetPrefer
 		])
 	}
 
+	private func configure(_ stepper: NSStepper, lowerBound: Double, upperBound: Double, action: Selector) {
+		stepper.minValue = lowerBound
+		stepper.maxValue = upperBound
+		stepper.increment = 1
+		stepper.valueWraps = false
+		stepper.autorepeat = true
+		stepper.target = self
+		stepper.action = action
+		stepper.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+	}
+
+	private static func header(_ title: String) -> NSTextField {
+		let header = NSTextField(labelWithString: title)
+		header.font = NSFont.systemFont(ofSize: 13, weight: .bold)
+		header.textColor = .labelColor
+		return header
+	}
+
 	// MARK: State
 
 	private func loadState() {
@@ -101,6 +130,7 @@ public final class SystemMonitorPreferencePane: NSViewController, PKWidgetPrefer
 		showDiskItem.state = Preferences[.shouldShowDiskItem] ? .on : .off
 		showIconsItem.state = Preferences[.shouldShowIcons] ? .on : .off
 		showBarsItem.state = Preferences[.shouldShowBars] ? .on : .off
+		showTemperatureItem.state = Preferences[.shouldShowTemperatureItem] ? .on : .off
 		refreshStepper.doubleValue = Preferences.refreshInterval
 		updateRefreshLabel()
 	}
@@ -137,6 +167,11 @@ public final class SystemMonitorPreferencePane: NSViewController, PKWidgetPrefer
 		/// Reflect the clamped value back into the control.
 		stepper.doubleValue = Preferences.refreshInterval
 		updateRefreshLabel()
+		NotificationCenter.default.post(name: .shouldReloadSystemMonitor, object: nil)
+	}
+
+	@IBAction private func didChangeTemperatureItem(_ checkbox: NSButton) {
+		Preferences[.shouldShowTemperatureItem] = checkbox.state == .on
 		NotificationCenter.default.post(name: .shouldReloadSystemMonitor, object: nil)
 	}
 }

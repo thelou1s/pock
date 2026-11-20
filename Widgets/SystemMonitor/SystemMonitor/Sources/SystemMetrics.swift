@@ -24,8 +24,11 @@ internal struct SystemMetricsSnapshot {
 
 	internal static let zero = SystemMetricsSnapshot(cpu: 0, memory: 0, disk: 0)
 
-	/// Returns the value for the given kind of metric.
-	internal subscript(kind: MetricKind) -> Double {
+	/// Returns the value for the given metric.
+	///
+	/// `nil` for a temperature, which is not part of a snapshot: the CPU reading
+	/// comes from `CPUTemperatureReader` instead.
+	internal subscript(kind: MetricKind) -> Double? {
 		switch kind {
 		case .cpu:
 			return cpu
@@ -33,6 +36,8 @@ internal struct SystemMetricsSnapshot {
 			return memory
 		case .disk:
 			return disk
+		case .temperature:
+			return nil
 		}
 	}
 }

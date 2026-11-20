@@ -9,11 +9,15 @@
 import AppKit
 import PockKit
 
-/// A Pock widget that keeps CPU, memory and disk usage in the Touch Bar.
+/// A Pock widget that keeps CPU, memory, disk and CPU temperature in the Touch
+/// Bar.
+///
+/// The temperature is read from the System Management Controller: the CPU package
+/// sensor where a machine publishes one, otherwise the hottest CPU core sensor.
 ///
 /// Tap an item to open the most useful app for that metric (Activity Monitor for
-/// CPU and memory, Finder for the disk). Long press any item to toggle the usage
-/// bars on and off.
+/// CPU, memory and temperature, System Settings for the disk). Long press any item
+/// to toggle the usage bars on and off.
 public final class SystemMonitorWidget: NSObject, PKWidget {
 
 	// MARK: PKWidget
@@ -72,6 +76,7 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 			object: nil
 		)
 		primeSamplerIfNeeded()
+		CPUTemperatureReader.shared.startScanIfNeeded()
 		reloadItems()
 	}
 
@@ -87,10 +92,9 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 	@objc private func reloadItems() {
 		Diagnostics.log("reload interval=\(Preferences.refreshInterval)")
 		clearItems()
-		for kind in Preferences.enabledKinds {
-			let item = MetricItem(kind: kind)
+		items = makeItems()
+		for item in items {
 			item.widget = self
-			items.append(item)
 			stackView.addArrangedSubview(item.view)
 		}
 		if items.isEmpty {
@@ -104,6 +108,19 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 		/// The refresh interval is a preference, so the timer is rebuilt every
 		/// time the item list changes.
 		restartRefreshTimer()
+	}
+
+	/// Builds one item per metric enabled in the preferences.
+	private func makeItems() -> [MetricItem] {
+		return Preferences.enabledKinds.map { kind in
+			let item = MetricItem(kind: kind)
+			if kind.isTemperature {
+				/// The cached reading, so the item is not blank while the first
+				/// refresh is still on its way.
+				item.celsius = CPUTemperatureReader.shared.currentCelsius
+			}
+			return item
+		}
 	}
 
 	private func clearItems() {
@@ -150,13 +167,29 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 		Diagnostics.log("refresh")
 		let snapshot = SystemMetricsSampler.shared.sample()
 		for item in items {
-			item.value = snapshot[item.kind]
+			if let usage = snapshot[item.kind] {
+				item.value = usage
+			}
 			item.reloadPreferences()
+		}
+		if items.contains(where: { $0.kind.isTemperature }) {
+			/// The sensor readings are taken off the main queue and reported back,
+			/// because a driver call may have to wait for the scan that started it.
+			CPUTemperatureReader.shared.refreshCelsius { [weak self] celsius in
+				self?.applyCPUValue(celsius)
+			}
 		}
 		#if DEBUG
 		/// Lets the headless test harness measure the refresh cadence.
 		print("[SystemMonitor] tick \(Date().timeIntervalSince1970)")
 		#endif
+	}
+
+	/// Applies a fresh reading to the temperature item.
+	private func applyCPUValue(_ celsius: Double?) {
+		for item in items where item.kind.isTemperature {
+			item.celsius = celsius
+		}
 	}
 
 	// MARK: Customization
@@ -168,9 +201,10 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 		preview.distribution = .fill
 		preview.spacing = 10
 		let snapshot = SystemMetricsSampler.shared.sample()
-		for kind in Preferences.enabledKinds {
-			let item = MetricItem(kind: kind)
-			item.value = snapshot[kind]
+		for item in makeItems() {
+			if let usage = snapshot[item.kind] {
+				item.value = usage
+			}
 			preview.addArrangedSubview(item.view)
 		}
 		preview.layoutSubtreeIfNeeded()
@@ -179,12 +213,20 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 	}
 
 	/// Renders the given view into an image, used by the customization palette.
+	///
+	/// The view is sized before being cached: a stack view built in memory still
+	/// has zero bounds, and caching into `view.bounds` produces an empty image.
 	private static func image(of view: NSView, size: NSSize) -> NSImage? {
-		guard size.width > 0, size.height > 0,
-			  let representation = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+		let rect = NSRect(origin: .zero, size: size)
+		guard size.width > 0, size.height > 0 else {
 			return nil
 		}
-		view.cacheDisplay(in: view.bounds, to: representation)
+		view.setFrameSize(size)
+		view.layoutSubtreeIfNeeded()
+		guard let representation = view.bitmapImageRepForCachingDisplay(in: rect) else {
+			return nil
+		}
+		view.cacheDisplay(in: rect, to: representation)
 		let image = NSImage(size: size)
 		image.addRepresentation(representation)
 		return image

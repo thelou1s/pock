@@ -4,3 +4,6 @@ build/
 ## widget's Podfile.lock under version control so its dependency versions
 ## (PockKit 0.3.0, TinyConstraints 4.0.2) stay reproducible.
 !Podfile.lock
+
+## Coverage data emitted when a widget bundle is loaded by a test harness.
+*.profraw

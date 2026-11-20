@@ -15,6 +15,7 @@ internal enum MetricKind: CaseIterable {
 	case cpu
 	case memory
 	case disk
+	case temperature
 
 	/// Human readable name, also used as accessibility description.
 	internal var title: String {
@@ -25,6 +26,8 @@ internal enum MetricKind: CaseIterable {
 			return "Memory"
 		case .disk:
 			return "Disk"
+		case .temperature:
+			return "CPU Temperature"
 		}
 	}
 
@@ -37,6 +40,8 @@ internal enum MetricKind: CaseIterable {
 			return "memorychip"
 		case .disk:
 			return "internaldrive"
+		case .temperature:
+			return "thermometer"
 		}
 	}
 
@@ -49,6 +54,8 @@ internal enum MetricKind: CaseIterable {
 			return "M"
 		case .disk:
 			return "D"
+		case .temperature:
+			return "T"
 		}
 	}
 
@@ -61,13 +68,20 @@ internal enum MetricKind: CaseIterable {
 			return .shouldShowMemoryItem
 		case .disk:
 			return .shouldShowDiskItem
+		case .temperature:
+			return .shouldShowTemperatureItem
 		}
+	}
+
+	/// Whether the item reports degrees Celsius rather than a percentage.
+	internal var isTemperature: Bool {
+		return self == .temperature
 	}
 
 	/// Opens the most useful app for the given metric.
 	internal func openRelatedApp() {
 		switch self {
-		case .cpu, .memory:
+		case .cpu, .memory, .temperature:
 			let url = URL(fileURLWithPath: "/System/Applications/Utilities/Activity Monitor.app")
 			if FileManager.default.fileExists(atPath: url.path) {
 				NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
@@ -131,7 +145,9 @@ internal final class MetricItem {
 		static let spacing: CGFloat = 5
 	}
 
-	/// Highlight thresholds, expressed in the `0...1` range.
+	/// Highlight thresholds, expressed in the `0...1` range. For a temperature
+	/// item that range is scaled by `CPUTemperatureReader.scaleCeiling`, so these
+	/// mean 60 °C and 85 °C.
 	private enum Threshold {
 		static let warning: Double = 0.6
 		static let critical: Double = 0.85
@@ -146,6 +162,15 @@ internal final class MetricItem {
 	internal var value: Double = 0 {
 		didSet {
 			render()
+		}
+	}
+
+	/// Reading in degrees Celsius, for the CPU temperature item, or nil when no
+	/// sensor reported one. It drives the bar through `value`, so both kinds share
+	/// one rendering path.
+	internal var celsius: Double? {
+		didSet {
+			value = (celsius ?? 0) / CPUTemperatureReader.scaleCeiling
 		}
 	}
 
@@ -248,11 +273,24 @@ internal final class MetricItem {
 	}
 
 	private func render() {
-		valueLabel.stringValue = "\(Int((min(max(value, 0), 1) * 100).rounded()))%"
+		valueLabel.stringValue = labelText
 		valueLabel.textColor = color
 		iconView.contentTintColor = color
 		fillView.layer?.backgroundColor = color.cgColor
 		fillWidth.constant = max(Layout.barHeight, CGFloat(min(max(value, 0), 1)) * Layout.barWidth)
+	}
+
+	/// `71°` for the CPU temperature, `42%` for a usage metric.
+	///
+	/// A reading that never arrived shows as `--` rather than as a temperature.
+	private var labelText: String {
+		guard kind.isTemperature else {
+			return "\(Int((min(max(value, 0), 1) * 100).rounded()))%"
+		}
+		guard let celsius = celsius else {
+			return "--"
+		}
+		return "\(Int(min(max(celsius, 0), 999).rounded()))°"
 	}
 
 	/// Re-applies the user preferences without recreating the item.
