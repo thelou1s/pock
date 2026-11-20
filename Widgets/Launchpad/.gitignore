@@ -1,0 +1,4 @@
+build/
+
+## Coverage data emitted when the widget bundle is loaded by a test harness.
+*.profraw
