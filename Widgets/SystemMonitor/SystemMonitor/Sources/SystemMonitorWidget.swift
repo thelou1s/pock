@@ -187,6 +187,7 @@ public final class SystemMonitorWidget: NSObject, PKWidget {
 
 	/// Applies a fresh reading to the temperature item.
 	private func applyCPUValue(_ celsius: Double?) {
+		Diagnostics.log("celsius=\(celsius.map { String(format: "%.2f", $0) } ?? "nil")")
 		for item in items where item.kind.isTemperature {
 			item.celsius = celsius
 		}

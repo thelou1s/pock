@@ -9,22 +9,29 @@
 import Foundation
 import IOKit
 
-/// Reads the CPU temperature through the `AppleSMC` user client.
+/// Reads the CPU temperature from the sensors Apple itself labels as CPU.
 ///
-/// The SMC interface is not a public API, so everything here is best effort: a
-/// machine where it is unavailable shows no temperature at all instead of
+/// The primary source is the HID event-system client: every Apple Silicon Mac
+/// publishes its core temperatures there under names such as
+/// `pACC MTR Temp Sensor3`, one per performance and efficiency core. Those are
+/// the sensors the open-source monitor `Hot` calls the CPU, and its rule is
+/// copied here: take the hottest of the `pACC`/`eACC` readings. The API is not
+/// in the public SDK, so its functions are looked up at run time.
+///
+/// If a machine publishes no such sensor the reader falls back to the
+/// `AppleSMC` user client, first the package key `TC0P` (what the `istats`
+/// command line tool reports) and then the hottest CPU core key (`Tp…` for the
+/// performance cores, `Te…` for the efficiency cores).
+///
+/// Both interfaces are undocumented, so everything here is best effort: a
+/// machine where neither is available shows no temperature at all instead of
 /// breaking the rest of the widget.
 ///
-/// Apple does not name the sensors, so the reading is derived: the CPU package
-/// sensor is used where a machine publishes one (`TC0P`, the key the `istats`
-/// command line tool reports as the CPU temperature), and where none exists the
-/// hottest CPU core sensor stands in for it. Both paths read the cores
-/// themselves, so the number is ours rather than a value another tool computed.
-///
 /// Every driver call runs on one serial queue, because a user client connection
-/// may not be shared by two callers. Enumerating the keys costs a few hundred
-/// milliseconds, which is why that happens once in the background; a refresh then
-/// only re-reads the sensors found back then and reports back on the main queue.
+/// may not be shared by two callers. Enumerating the SMC keys costs a few hundred
+/// milliseconds, which is why that happens once in the background and only when
+/// the HID sensors are missing; a refresh then re-reads what was found back then
+/// and reports back on the main queue.
 internal final class CPUTemperatureReader {
 
 	internal static let shared = CPUTemperatureReader()
@@ -80,6 +87,7 @@ internal final class CPUTemperatureReader {
 	private let queue = DispatchQueue(label: "com.luis.pock.SystemMonitor.smc")
 	private let gate = NSLock()
 	private var state: State = .idle
+	private var hid: HIDSensors?
 	private var packageSensors: [Channel] = []
 	private var coreSensors: [Channel] = []
 	private var lastCelsius: Double?
@@ -136,7 +144,32 @@ internal final class CPUTemperatureReader {
 
 	// MARK: Scanning
 
+	/// Finds the sensors to read. Runs on the SMC queue.
+	///
+	/// The HID sensors come first: Apple names them, they need no key enumeration,
+	/// and they are the sensors `Hot` reports. A machine that publishes none gets
+	/// the SMC scan.
 	private func scan() {
+		if let client = HIDSensors() {
+			let values = client.cpuValues()
+			if values.isEmpty == false {
+				gate.lock()
+				hid = client
+				lastCelsius = values.max()
+				state = .ready
+				gate.unlock()
+				/// The item list is built before the first values arrive, so ask for
+				/// a rebuild now that there is something to show.
+				DispatchQueue.main.async {
+					NotificationCenter.default.post(name: .shouldReloadSystemMonitor, object: nil)
+				}
+				return
+			}
+		}
+		scanSMC()
+	}
+
+	private func scanSMC() {
 		guard open() else {
 			markUnavailable()
 			return
@@ -190,11 +223,20 @@ internal final class CPUTemperatureReader {
 	}
 
 	/// Runs on the SMC queue.
-	///
+	private func readCelsius() -> Double? {
+		gate.lock()
+		let client = hid
+		gate.unlock()
+		if let client = client {
+			return keep(client.cpuValues().max())
+		}
+		return keep(readSMC())
+	}
+
 	/// The package sensor is used whenever the machine publishes one: that is the
 	/// reading `istats cpu` calls the CPU temperature. Apple Silicon does not
 	/// publish it, and there the hottest core becomes the CPU temperature.
-	private func readCelsius() -> Double? {
+	private func readSMC() -> Double? {
 		gate.lock()
 		let package = packageSensors
 		let cores = coreSensors
@@ -225,15 +267,17 @@ internal final class CPUTemperatureReader {
 				}
 			}
 		}
+		return reading
+	}
 
+	/// Remembers a reading, so that one failed tick does not blank the bar.
+	private func keep(_ celsius: Double?) -> Double? {
 		gate.lock()
-		/// A failed read keeps the previous number: one bad tick should not blank
-		/// the bar.
-		if let reading = reading {
-			lastCelsius = reading
+		if let celsius = celsius {
+			lastCelsius = celsius
 		}
 		gate.unlock()
-		return reading
+		return celsius
 	}
 
 	private func markUnavailable() {
@@ -452,5 +496,124 @@ internal final class CPUTemperatureReader {
 					UInt8((value >> 8) & 0xff), UInt8(value & 0xff)]
 		return String(bytes: bytes.map { (0x20...0x7e).contains($0) ? $0 : UInt8(ascii: "?") },
 					  encoding: .ascii) ?? "????"
+	}
+}
+
+/// The CPU core temperatures as Apple publishes them on the HID event bus.
+///
+/// Every service on that bus has a product name, and the core sensors are the
+/// ones Apple labels `pACC MTR Temp Sensor…` for the performance cores and
+/// `eACC MTR Temp Sensor…` for the efficiency ones. Naming them is why this is
+/// the preferred source: unlike an SMC key such as `Tp2h`, the name says what is
+/// being measured.
+///
+/// The event-system client is not part of the public SDK, so the six functions
+/// are looked up in IOKit at run time. A failure to find any of them - or a
+/// machine that publishes no such service - makes the initializer return nil,
+/// and the reader then falls back to the SMC keys.
+///
+/// Only ever used from the reader's serial queue, so nothing here is guarded.
+internal final class HIDSensors {
+
+	/// Name prefixes of the CPU sensors: `pACC` for the performance cores,
+	/// `eACC` for the efficiency cores.
+	private static let cpuNamePrefixes: [String] = ["pACC", "eACC"]
+
+	/// Readings outside this range are a service without a sensor, not a
+	/// temperature.
+	private static let plausibleRange: Range<Double> = 0..<120
+
+	/// Temperature sensors live on Apple's vendor usage page `0xff00` under
+	/// usage `5`, which is what selects them out of all the HID services.
+	private static let serviceMatch: NSDictionary = [
+		"PrimaryUsagePage": NSNumber(value: 0xff00),
+		"PrimaryUsage": NSNumber(value: 5),
+	]
+
+	/// The HID event type that carries a temperature.
+	private static let temperatureEvent: Int64 = 0x0f
+
+	/// The field of that event holding the reading, as a usage page and index.
+	private static let temperatureField: Int32 = Int32(0x0f << 16)
+
+	private typealias Client = UnsafeMutableRawPointer
+	private typealias Create = @convention(c) (Unmanaged<CFAllocator>?) -> Client?
+	private typealias SetMatching = @convention(c) (Client?, CFDictionary?) -> Void
+	private typealias CopyServices = @convention(c) (Client?) -> Unmanaged<CFArray>?
+	private typealias CopyProperty = @convention(c) (UnsafeRawPointer?, CFString) -> Unmanaged<CFTypeRef>?
+	private typealias CopyEvent = @convention(c) (UnsafeRawPointer?, Int64, UInt32, UInt64) -> Unmanaged<CFTypeRef>?
+	private typealias FloatValue = @convention(c) (CFTypeRef?, Int32) -> Double
+
+	private let client: Client
+	private let copyServices: CopyServices
+	private let copyProperty: CopyProperty
+	private let copyEvent: CopyEvent
+	private let floatValue: FloatValue
+
+	/// nil when the interface is unavailable, which is the case on a system that
+	/// does not export it.
+	internal init?() {
+		guard let library = dlopen("/System/Library/Frameworks/IOKit.framework/IOKit", RTLD_NOW) else {
+			return nil
+		}
+		guard let create = Self.function(Create.self, from: library, "IOHIDEventSystemClientCreate"),
+			  let setMatching = Self.function(SetMatching.self, from: library, "IOHIDEventSystemClientSetMatching"),
+			  let copyServices = Self.function(CopyServices.self, from: library, "IOHIDEventSystemClientCopyServices"),
+			  let copyProperty = Self.function(CopyProperty.self, from: library, "IOHIDServiceClientCopyProperty"),
+			  let copyEvent = Self.function(CopyEvent.self, from: library, "IOHIDServiceClientCopyEvent"),
+			  let floatValue = Self.function(FloatValue.self, from: library, "IOHIDEventGetFloatValue"),
+			  let client = create(nil) else {
+			return nil
+		}
+		setMatching(client, Self.serviceMatch)
+		self.client = client
+		self.copyServices = copyServices
+		self.copyProperty = copyProperty
+		self.copyEvent = copyEvent
+		self.floatValue = floatValue
+	}
+
+	/// The reading of every CPU core sensor, unordered. Empty when none answers.
+	internal func cpuValues() -> [Double] {
+		guard let services = copyServices(client)?.takeRetainedValue() else {
+			return []
+		}
+		var values: [Double] = []
+		for index in 0..<CFArrayGetCount(services) {
+			guard let service = CFArrayGetValueAtIndex(services, index) else {
+				continue
+			}
+			guard let name = productName(service),
+				  Self.isCPUSensor(name),
+				  let event = copyEvent(service, Self.temperatureEvent, 0, 0) else {
+				continue
+			}
+			let celsius = floatValue(event.takeRetainedValue(), Self.temperatureField)
+			if Self.plausibleRange.contains(celsius) {
+				values.append(celsius)
+			}
+		}
+		return values
+	}
+
+	private static func function<T>(_ type: T.Type, from library: UnsafeMutableRawPointer,
+									_ symbol: String) -> T? {
+		guard let address = dlsym(library, symbol) else {
+			return nil
+		}
+		return unsafeBitCast(address, to: T.self)
+	}
+
+	/// The property is a `CFString`; a service without one is normal, so nothing
+	/// is said about it.
+	private func productName(_ service: UnsafeRawPointer) -> String? {
+		guard let product = copyProperty(service, "Product" as CFString)?.takeRetainedValue() else {
+			return nil
+		}
+		return product as? String
+	}
+
+	private static func isCPUSensor(_ name: String) -> Bool {
+		cpuNamePrefixes.contains { name.hasPrefix($0) }
 	}
 }
